@@ -3,11 +3,6 @@ function logToSheet(message) {
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   var logsSheet = spreadsheet.getSheetByName("Logs");
 
-  // If the Logs sheet does not exist, create it
-  if (!logsSheet) {
-    logsSheet = spreadsheet.insertSheet("Logs");
-  }
-
   // Determine the next available row in the Logs sheet
   var nextRow = logsSheet.getLastRow() + 1;
 
