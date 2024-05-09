@@ -1,0 +1,169 @@
+function logToSheet(message) {
+  // Get the active spreadsheet and the Logs sheet
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var logsSheet = spreadsheet.getSheetByName("Logs");
+
+  // If the Logs sheet does not exist, create it
+  if (!logsSheet) {
+    logsSheet = spreadsheet.insertSheet("Logs");
+  }
+
+  // Determine the next available row in the Logs sheet
+  var nextRow = logsSheet.getLastRow() + 1;
+
+  // Set the log message in the appropriate cell
+  logsSheet.getRange(nextRow, 1).setValue(message);
+}
+
+function onEdit(e) {
+    // Get the edited range and value
+    var editedRange = e.range;
+    var editedValue = e.value;
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var outputSheet = spreadsheet.getSheetByName("Output");
+    var logsSheet = spreadsheet.getSheetByName("Logs");
+
+    // Check if the edited cell is in the "Output" sheet and is the dropdown cell (C1)
+    if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "C1" && editedValue === "Run") {
+        logToSheet("Dropdown changed to 'Run'. Starting data organization.");
+        // Call the function to organize data when the dropdown is set to "Run"
+        organizeData();
+    }
+    
+    // Check if the edited cell is in the "Output" sheet and is the checkbox cell (D1)
+    if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "D1") {
+        // If the checkbox is checked (value is true)
+        if (editedValue) {
+            // Clear everything in Output sheet after row 2
+            outputSheet.getRange("A3:Z" + outputSheet.getMaxRows()).clearContent();
+
+            // Clear everything in Logs sheet
+            logsSheet.clear();
+        }
+    }
+}
+
+
+function organizeData() {
+    // Get references to the sheets
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var roosterTeethSheet = spreadsheet.getSheetByName("RoosterTeeth");
+    var youtubeSheet = spreadsheet.getSheetByName("Youtube");
+    var outputSheet = spreadsheet.getSheetByName("Output");
+    logToSheet("Got references to sheets.");
+
+    // Determine the starting row for the output sheet
+    var lastOutputRow = outputSheet.getLastRow();
+    var outputStartRow = lastOutputRow + 1;
+    logToSheet("Determined last row in output sheet.");
+
+    // Batch sizes
+    var youtubeBatchSize = 5; // Process 5 YouTube rows at a time
+    var roosterTeethBatchSize = 20; // Process 20 RoosterTeeth rows at a time
+    logToSheet(`Set YouTube batch size to ${youtubeBatchSize} and RoosterTeeth batch size to ${roosterTeethBatchSize}.`);
+
+    // Get data ranges and values from the sheets
+    var roosterTeethDataRange = roosterTeethSheet.getDataRange();
+    var youtubeDataRange = youtubeSheet.getDataRange();
+    var roosterTeethData = roosterTeethDataRange.getValues();
+    var roosterTeethBackgroundColors = roosterTeethDataRange.getBackgrounds();
+    var youtubeData = youtubeDataRange.getValues();
+    logToSheet("Got data ranges and values from RoosterTeeth and YouTube sheets.");
+
+    // Skip header rows
+    roosterTeethData.shift();
+    youtubeData.shift();
+    roosterTeethBackgroundColors.shift();
+
+    // Define column index for show name in RoosterTeeth sheet (column E)
+    var showNameColumnIndex = 4; // Zero-based index, so E is 4
+    logToSheet("Defined column index for show name.");
+
+    // Define the desired show name for comparison
+    var desiredShowName = "VS";
+    logToSheet("Set desired show name.");
+
+    // Process YouTube data in batches of 5
+    var youtubeRowIndex = 0;
+    while (youtubeRowIndex < youtubeData.length) {
+        // Get the end index for the current batch of YouTube rows
+        var youtubeEndIndex = Math.min(youtubeRowIndex + youtubeBatchSize, youtubeData.length);
+
+        // Array to hold matches for the current batch of YouTube rows
+        var outputData = [];
+        logToSheet("Processing new batch of YouTube rows.");
+
+        // Process each YouTube row in the current batch
+        for (var i = youtubeRowIndex; i < youtubeEndIndex; i++) {
+            var youtubeRow = youtubeData[i];
+            var youtubeDate = new Date(youtubeRow[3]);
+            var youtubeURL = youtubeRow[1];
+
+            // Process each RoosterTeeth batch of 20 rows
+            var roosterTeethRowIndex = 0;
+            var matchFound = false;
+
+            while (roosterTeethRowIndex < roosterTeethData.length) {
+                // Define the end index for the current batch of RoosterTeeth rows
+                var roosterTeethEndIndex = Math.min(roosterTeethRowIndex + roosterTeethBatchSize, roosterTeethData.length);
+
+                // Process each RoosterTeeth row in the current batch
+                for (var j = roosterTeethRowIndex; j < roosterTeethEndIndex; j++) {
+                    // Skip RoosterTeeth rows where the date cell has a green background
+                    var roosterTeethDateBackgroundColor = roosterTeethBackgroundColors[j][3];
+                    if (roosterTeethDateBackgroundColor === "#00ff00") {
+                        continue; // Skip this RoosterTeeth row because the date cell is green
+                    }
+
+                    var roosterTeethRow = roosterTeethData[j];
+                    var roosterTeethDate = new Date(roosterTeethRow[3]);
+                    var roosterTeethShowName = roosterTeethRow[showNameColumnIndex];
+                    var roosterTeethURL = roosterTeethRow[1];
+
+                    // Compare YouTube and RoosterTeeth data
+                    if (roosterTeethShowName === desiredShowName && youtubeDate.getTime() === roosterTeethDate.getTime()) {
+                        // Set background color of RoosterTeeth date cell to green
+                        roosterTeethSheet.getRange(j + 2, 4).setBackground("green");
+                        roosterTeethBackgroundColors[j][3] = "#00ff00"; // Update the background color in the array
+                        logToSheet(`Match found: YouTube URL = ${youtubeURL}, RoosterTeeth URL = ${roosterTeethURL}`);
+
+                        // Add YouTube URL and matching RoosterTeeth URL to output data
+                        outputData.push([youtubeURL, roosterTeethURL]);
+
+                        // Break inner loop as a match has been found
+                        matchFound = true;
+                        break;
+                    }
+                }
+
+                // Update the RoosterTeeth row index for the next batch of 20 rows
+                roosterTeethRowIndex = roosterTeethEndIndex;
+
+                // If a match was found, stop searching further
+                if (matchFound) {
+                    break;
+                }
+            }
+
+            // If no match was found in any RoosterTeeth batch, add "No match found" for the current YouTube row
+            if (!matchFound) {
+                outputData.push(["No match found", "no match found"]);
+            }
+        }
+
+        // Batch update the output sheet with matches from the current YouTube batch
+        outputSheet.getRange(outputStartRow, 1, outputData.length, 2).setValues(outputData);
+        outputStartRow += outputData.length; // Update the starting row for the next batch of matches
+
+        // Update YouTube row index for the next batch of 5 rows
+        youtubeRowIndex = youtubeEndIndex;
+        logToSheet("YouTube row index updated.");
+
+        // Reset outputData array for the next YouTube batch
+        outputData = [];
+    }
+
+    logToSheet("Done.");
+    // Reset the dropdown to Stop
+    outputSheet.getRange("C1").setValue("Stop");
+}
