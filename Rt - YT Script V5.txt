@@ -62,18 +62,10 @@ function organizeData() {
     var roosterTeethBatchSize = 20; // Process 20 RoosterTeeth rows at a time
     logToSheet(`Set YouTube batch size to ${youtubeBatchSize} and RoosterTeeth batch size to ${roosterTeethBatchSize}.`);
 
-    // Get data ranges and values from the sheets
-    var roosterTeethDataRange = roosterTeethSheet.getDataRange();
+    // Get YouTube data and skip header row
     var youtubeDataRange = youtubeSheet.getDataRange();
-    var roosterTeethData = roosterTeethDataRange.getValues();
-    var roosterTeethBackgroundColors = roosterTeethDataRange.getBackgrounds();
     var youtubeData = youtubeDataRange.getValues();
-    logToSheet("Got data ranges and values from RoosterTeeth and YouTube sheets.");
-
-    // Skip header rows
-    roosterTeethData.shift();
     youtubeData.shift();
-    roosterTeethBackgroundColors.shift();
 
     // Define column index for show name in RoosterTeeth sheet (column E)
     var showNameColumnIndex = 4; // Zero-based index, so E is 4
@@ -83,7 +75,7 @@ function organizeData() {
     var desiredShowName = "VS";
     logToSheet("Set desired show name.");
 
-    // Process YouTube data in batches of 5
+    // Process YouTube data in batches of 5 rows
     var youtubeRowIndex = 0;
     while (youtubeRowIndex < youtubeData.length) {
         // Get the end index for the current batch of YouTube rows
@@ -99,53 +91,65 @@ function organizeData() {
             var youtubeDate = new Date(youtubeRow[3]);
             var youtubeURL = youtubeRow[1];
 
-            // Process each RoosterTeeth batch of 20 rows
-            var roosterTeethRowIndex = 0;
+            // Initialize match found flag
             var matchFound = false;
 
-            while (roosterTeethRowIndex < roosterTeethData.length) {
-                // Define the end index for the current batch of RoosterTeeth rows
-                var roosterTeethEndIndex = Math.min(roosterTeethRowIndex + roosterTeethBatchSize, roosterTeethData.length);
+            // Process each batch of RoosterTeeth data (20 rows at a time)
+            var roosterTeethRowIndex = 1; // Start from row 2, since 1st is header
+            while (roosterTeethRowIndex < roosterTeethSheet.getLastRow()) {
+                // Define the range of RoosterTeeth batch (20 rows at a time)
+                var roosterTeethEndIndex = Math.min(roosterTeethRowIndex + roosterTeethBatchSize - 1, roosterTeethSheet.getLastRow());
+                var roosterTeethDataRange = roosterTeethSheet.getRange(roosterTeethRowIndex, 1, roosterTeethEndIndex - roosterTeethRowIndex + 1, 6);
+                var roosterTeethData = roosterTeethDataRange.getValues();
+                var roosterTeethBackgroundColors = roosterTeethDataRange.getBackgrounds();
 
                 // Process each RoosterTeeth row in the current batch
-                for (var j = roosterTeethRowIndex; j < roosterTeethEndIndex; j++) {
-                    // Skip RoosterTeeth rows where the date cell has a green background
-                    var roosterTeethDateBackgroundColor = roosterTeethBackgroundColors[j][3];
-                    if (roosterTeethDateBackgroundColor === "#00ff00") {
-                        continue; // Skip this RoosterTeeth row because the date cell is green
-                    }
-
+                for (var j = 0; j < roosterTeethData.length; j++) {
                     var roosterTeethRow = roosterTeethData[j];
                     var roosterTeethDate = new Date(roosterTeethRow[3]);
                     var roosterTeethShowName = roosterTeethRow[showNameColumnIndex];
                     var roosterTeethURL = roosterTeethRow[1];
+                    var roosterTeethDateBackgroundColor = roosterTeethBackgroundColors[j][3];
+
+                    // Skip RoosterTeeth rows where the date cell has a green background
+                    if (roosterTeethDateBackgroundColor === "#00ff00") {
+                        continue; // Skip this RoosterTeeth row because the date cell is green
+                    }
 
                     // Compare YouTube and RoosterTeeth data
                     if (roosterTeethShowName === desiredShowName && youtubeDate.getTime() === roosterTeethDate.getTime()) {
                         // Set background color of RoosterTeeth date cell to green
-                        roosterTeethSheet.getRange(j + 2, 4).setBackground("green");
-                        roosterTeethBackgroundColors[j][3] = "#00ff00"; // Update the background color in the array
+                        roosterTeethSheet.getRange(roosterTeethRowIndex + j, 4).setBackground("green");
                         logToSheet(`Match found: YouTube URL = ${youtubeURL}, RoosterTeeth URL = ${roosterTeethURL}`);
 
                         // Add YouTube URL and matching RoosterTeeth URL to output data
                         outputData.push([youtubeURL, roosterTeethURL]);
+                        
+                        // Update the background color in the array
+                        roosterTeethDataRange.getCell(j + 1, 4).setBackground("green");
 
-                        // Break inner loop as a match has been found
+                        // Break the loop as a match has been found
                         matchFound = true;
                         break;
                     }
                 }
 
-                // Update the RoosterTeeth row index for the next batch of 20 rows
-                roosterTeethRowIndex = roosterTeethEndIndex;
-
-                // If a match was found, stop searching further
+                // If match found, stop searching further for the current YouTube row
                 if (matchFound) {
                     break;
                 }
+
+                // logging to track everytime it moves to a new batch of RT rows while looking for a match on the same YT row
+                logToSheet(`No match found in RoosterTeeth batch starting at row ${roosterTeethRowIndex} for YouTube row at index ${i}.`);
+
+                // Move to the next batch of RoosterTeeth rows
+                roosterTeethRowIndex = roosterTeethEndIndex + 1;
+
+                // Drop the data from the current batch (removing reference for garbage collection)
+                roosterTeethData = [];
             }
 
-            // If no match was found in any RoosterTeeth batch, add "No match found" for the current YouTube row
+            // Handle no match case
             if (!matchFound) {
                 outputData.push(["No match found", "no match found"]);
             }
