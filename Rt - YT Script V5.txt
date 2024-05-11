@@ -1,10 +1,23 @@
-function onEdit(e) {
+function onEditInstallable(e) {
+    // Validate the event object
+    if (!e) {
+        logToSheet("No event object received");
+        return;
+    }
+
     // Get the edited range and value
-    var editedRange = e.range;
-    var editedValue = e.value;
-    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    var outputSheet = spreadsheet.getSheetByName("Output");
-    var logsSheet = spreadsheet.getSheetByName("Logs");
+    const editedRange = e.range;
+    const editedValue = e.value;
+
+    // Validate the range and value
+    if (!editedRange || typeof editedValue === 'undefined') {
+        logToSheet("Invalid range or value in event");
+        return;
+    }
+
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const outputSheet = spreadsheet.getSheetByName("Output");
+    const logsSheet = spreadsheet.getSheetByName("Logs");
 
     // Check if the drop-down changed to "Run" in the Output sheet
     if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "C1" && editedValue === "Run") {
@@ -12,24 +25,27 @@ function onEdit(e) {
         // Call the function to organize data when the dropdown is set to "Run"
         organizeData();
     }
-    
+
     // Check if the checkbox to clear data in Output sheet was pressed
     if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "D1") {
-        if (editedValue) {
+        if (editedValue === "TRUE") {
             // Clear everything in Output sheet after row 2
             outputSheet.getRange("A3:Z" + outputSheet.getMaxRows()).clearContent();
             // Clear everything in Logs sheet
             logsSheet.clear();
-            logToSheet ("cleared output and log sheet.");
+            logToSheet("Cleared output and log sheet.");
         }
     }
 
+    // Check if the checkbox to delete last row properties was pressed
     if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "F1") {
-        deleteLastRowProperties();
-            
+        if (editedValue === "TRUE") {
+            deleteLastRowProperties();
+            logToSheet("Deleted last row properties.");
         }
-
+    }
 }
+
 
 function organizeData() {
     // Define variables
@@ -48,10 +64,10 @@ function organizeData() {
     // Determine the starting row for the output sheet
     let lastOutputRow = outputSheet.getLastRow();
     let outputStartRow = lastOutputRow + 1;
-    logToSheet("Determined last row in output sheet.");
+    //     logToSheet("Determined last row in output sheet.");
 
     // Batch sizes
-    var youtubeBatchSize = 10; // Process 5 YouTube rows at a time
+    var youtubeBatchSize = 20; // Process 5 YouTube rows at a time
     var roosterTeethBatchSize = 1000; // Process 1000 RoosterTeeth rows at a time
     logToSheet(`Set YouTube batch size to ${youtubeBatchSize} and RoosterTeeth batch size to ${roosterTeethBatchSize}.`);
 
@@ -62,11 +78,11 @@ function organizeData() {
 
     // Define column index for show name in RoosterTeeth sheet (column E)
     var showNameColumnIndex = 4; // Zero-based index, so E is 4
-    logToSheet("Defined column index for show name.");
+    //   logToSheet("Defined column index for show name.");
 
     // Define the desired show name for comparison
     var desiredShowName = "VS";
-    logToSheet("Set desired show name.");
+    logToSheet("Set desired show name");
 
     // Process YouTube data in batches of 5 rows
 while (lastYouTubeRow < youtubeData.length) {
@@ -89,7 +105,7 @@ while (lastYouTubeRow < youtubeData.length) {
         let matchFound = false;
 
         // Log details of the current YouTube row being processed
-        logToSheet(`Processing YouTube row at index ${i}: URL = ${youtubeURL}, Date = ${youtubeDate.toISOString()}.`);
+        //         logToSheet(`Processing YouTube row at index ${i}: URL = ${youtubeURL}, Date = ${youtubeDate.toISOString()}.`);
 
         // Process each batch of RoosterTeeth data in the current batch
         while (lastRoosterTeethRow <= roosterTeethSheet.getLastRow()) {
@@ -100,7 +116,7 @@ while (lastYouTubeRow < youtubeData.length) {
             var roosterTeethBackgroundColors = roosterTeethDataRange.getBackgrounds();
 
             // Log details of the current batch of RoosterTeeth rows being processed
-            logToSheet(`Processing RoosterTeeth rows from index ${lastRoosterTeethRow} to ${roosterTeethEndIndex}.`);
+            //     logToSheet(`Processing RoosterTeeth rows from index ${lastRoosterTeethRow} to ${roosterTeethEndIndex}.`);
 
             // Process each RoosterTeeth row in the current batch
             for (let j = 0; j < roosterTeethData.length; j++) {
@@ -114,8 +130,8 @@ while (lastYouTubeRow < youtubeData.length) {
                 // logToSheet(`Processing RoosterTeeth row at index ${lastRoosterTeethRow + j}: Date Cell Background Color = ${roosterTeethDateBackgroundColor}.`);
 
                 // Skip RoosterTeeth rows where the date cell has a green background
-                if (roosterTeethDateBackgroundColor === "#00ff00") {
-                    logToSheet(`Skipping RoosterTeeth row at index ${lastRoosterTeethRow + j} due to green date cell background.`);
+                if (roosterTeethDateBackgroundColor === "#008000") {
+                    //     logToSheet(`Skipping RoosterTeeth row at index ${lastRoosterTeethRow + j} since its already been matched.`);
                     continue; // Skip this RoosterTeeth row because the date cell is green
                 }
 
@@ -123,7 +139,7 @@ while (lastYouTubeRow < youtubeData.length) {
                           if (roosterTeethShowName === desiredShowName && Math.abs(youtubeDate - roosterTeethDate) <= 2 * 24 * 60 * 60 * 1000) {
                               // Set background color of RoosterTeeth date cell to green
                               roosterTeethSheet.getRange(lastRoosterTeethRow + j, 4).setBackground("green");
-                              logMatchToSheet(`Match found: YouTube URL = ${youtubeURL}, RoosterTeeth URL = ${roosterTeethURL}`);
+                              logMatchToSheet(`Match found!: YouTube URL = ${youtubeURL}, RoosterTeeth URL = ${roosterTeethURL}`);
 
                               // Add YouTube URL and matching RoosterTeeth URL to output data
                               outputData.push([youtubeURL, roosterTeethURL]);
@@ -133,6 +149,8 @@ while (lastYouTubeRow < youtubeData.length) {
 
                               // Break the loop as a match has been found
                               matchFound = true;
+                              deleteRTProperties();
+                              //     logToSheet ('Reseting RT Rows')
                               break;
                           }
 
@@ -140,45 +158,58 @@ while (lastYouTubeRow < youtubeData.length) {
 
             // If match found, stop searching further for the current YouTube row
             if (matchFound) {
-                logToSheet(`Match found for YouTube row at index ${i}. Stopping search in RoosterTeeth batch.`);
+                //  logToSheet(`Match found for YouTube row at index ${i}. Stopping search in Current RoosterTeeth batch.`);
                 break;
             }
 
-            // Move to the next batch of RoosterTeeth rows
+            // Move to the next batch of RoosterTeeth rows if a match is not found from current batch
+            // logToSheet ("moving to next batch of rt rows");
             lastRoosterTeethRow = roosterTeethEndIndex + 1;
 
-            // Drop the data from the current batch (removing reference for garbage collection)
+            // Drop the data from the current batch 
             roosterTeethData = [];
-            logToSheet(`Updated lastRoosterTeethRow to ${lastRoosterTeethRow}.`);
+           //  logToSheet(`Updated lastRoosterTeethRow to ${lastRoosterTeethRow}.`);
         }
 
-        // Handle no match case
+          // Handle no match case
         if (!matchFound) {
-            logToSheet(`No match found for YouTube row at index ${i}. Adding "No match found" to output data.`);
+           //  logToSheet(`No match found for YouTube row at index ${i}. Adding "No match found" to output data.`);
             outputData.push(["No match found", "No match found"]);
+            deleteRTProperties();
+           //   logToSheet('Resetting RT Rows');
+            // Reset lastRoosterTeethRow to 0 to start from the beginning of the RoosterTeeth data
+            lastRoosterTeethRow = 1;
+            // Drop the data from the current batch for garbage collection
+            roosterTeethData = [];
+            //  logToSheet(`Reset lastRoosterTeethRow to 0.`);
         }
     }
 
     // Batch update the output sheet with matches from the current YouTube batch
-    logToSheet(`Batch updating output sheet starting at row ${outputStartRow}.`);
+    logToSheet(`Youtube batch complete updating output sheet starting at row ${outputStartRow}.`);
     outputSheet.getRange(outputStartRow, 1, outputData.length, 2).setValues(outputData);
     outputStartRow += outputData.length; // Update the starting row for the next batch of matches
 
-    logToSheet(`Batch update completed. Updated outputStartRow to ${outputStartRow}.`);
+    logToSheet("Batch update completed.");  // Updated outputStartRow to ${outputStartRow}.`   --  add this back into the left log for debuggins when needed
 
     // Update YouTube row index for the next batch of rows
     lastYouTubeRow = youtubeEndIndex;
-    logToSheet(`Updated lastYouTubeRow to ${lastYouTubeRow} for the next batch of YouTube rows.`);
+    // logToSheet(`Updated lastYouTubeRow to ${lastYouTubeRow} for the next batch of YouTube rows.`);
 
     // Reset outputData array for the next YouTube batch
     outputData = [];
 
     // Update last processed row indices in properties
-    logToSheet(`Updating properties: lastYouTubeRow = ${lastYouTubeRow}, lastRoosterTeethRow = ${lastRoosterTeethRow}.`);
+    // logToSheet(`Updating properties: lastYouTubeRow = ${lastYouTubeRow}, lastRoosterTeethRow = ${lastRoosterTeethRow}.`);
     properties.setProperty('lastYouTubeRow', lastYouTubeRow.toString());
     properties.setProperty('lastRoosterTeethRow', lastRoosterTeethRow.toString());
 
     logToSheet(`Properties updated. Ending current iteration of loop.`);
+   
+   logToSheet ("creating trigger to pause function")
+   setOrganizeDataTrigger ();
+    
+
 }
 
 
@@ -189,10 +220,10 @@ while (lastYouTubeRow < youtubeData.length) {
    deleteLastRowProperties();
 }
 
-//delete all saved data of current row the main function
+//delete all saved data of RT and YT current rows in the main function
 function deleteLastRowProperties() {
     // Access the user properties
-    var properties = PropertiesService.getUserProperties();
+    const properties = PropertiesService.getUserProperties();
 
     // Delete the properties for last YouTube row and last RoosterTeeth row
     properties.deleteProperty('lastYouTubeRow');
@@ -202,17 +233,26 @@ function deleteLastRowProperties() {
     logToSheet("Deleted lastYouTubeRow and lastRoosterTeethRow properties.");
 }
 
+//delete all saved data of RT Rows current rows
+function deleteRTProperties() {
+    // Access the user properties
+    const properties = PropertiesService.getUserProperties();
+
+    // Delete the properties forlast RoosterTeeth row
+    properties.deleteProperty('lastRoosterTeethRow');
+}
+
 function setOrganizeDataTrigger() {
     // Manage triggers to ensure only one active trigger
     manageTriggers();
 
-    // Set a time-based trigger to continue processing after 2 seconds
+    // Set a time-based trigger to continue processing after 1 seconds
     ScriptApp.newTrigger('organizeData')
         .timeBased()
         .after(2000)
         .create();
 
-    logToSheet("Organize data trigger set.");
+    // logToSheet("Freeze data trigger set.");
 }
 
 function manageTriggers() {
@@ -221,7 +261,7 @@ function manageTriggers() {
     triggers.forEach((trigger) => {
         if (trigger.getHandlerFunction() === 'organizeData') {
             ScriptApp.deleteTrigger(trigger);
-            logToSheet("Deleted existing trigger.");
+            // logToSheet("Deleted existing trigger.");
         }
     });
 }
