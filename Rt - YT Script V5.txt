@@ -19,14 +19,14 @@ function onEditInstallable(e) {
     const outputSheet = spreadsheet.getSheetByName("Output");
     const logsSheet = spreadsheet.getSheetByName("Logs");
 
-    // Check if the drop-down changed to "Run" in the Output sheet
+    // Edit to Start Main Function
     if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "C1" && editedValue === "Run") {
         logToSheet("Dropdown changed to 'Run'. Starting data organization.");
         // Call the function to organize data when the dropdown is set to "Run"
         organizeData();
     }
 
-    // Check if the checkbox to clear data in Output sheet was pressed
+    // Edit to clear Output, Logs, and Row Data
     if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "D1") {
         if (editedValue === "TRUE") {
             // Clear everything in Output sheet after row 2
@@ -34,41 +34,37 @@ function onEditInstallable(e) {
             // Clear everything in Logs sheet
             logsSheet.clear();
             logToSheet("Cleared output and log sheet.");
-        }
-    }
-
-    // Check if the checkbox to delete last row properties was pressed
-    if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "F1") {
-        if (editedValue === "TRUE") {
             deleteLastRowProperties();
-            logToSheet("Deleted last row properties.");
         }
     }
 }
 
 
+
 function organizeData() {
     // Define variables
+    logToSheet("main function started!");
+    manageTriggers ();
     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     var outputSheet = spreadsheet.getSheetByName("Output");
     var roosterTeethSheet = spreadsheet.getSheetByName("RoosterTeeth");
     var youtubeSheet = spreadsheet.getSheetByName("Youtube");
     var properties = PropertiesService.getUserProperties();
     
-    logToSheet("Got references to sheets.");
+    // logToSheet("Got references to sheets.");
     
     // Retrieve last processed row indices from properties
     let lastYouTubeRow = parseInt(properties.getProperty('lastYouTubeRow'), 10) || 0;
-    let lastRoosterTeethRow = parseInt(properties.getProperty('lastRoosterTeethRow'), 10) || 1;
+    //let lastRoosterTeethRow = parseInt(properties.getProperty('lastRoosterTeethRow'), 10) || 1;  -----no longer in use 
 
     // Determine the starting row for the output sheet
     let lastOutputRow = outputSheet.getLastRow();
     let outputStartRow = lastOutputRow + 1;
     //     logToSheet("Determined last row in output sheet.");
 
-    // Batch sizes
-    var youtubeBatchSize = 20; // Process 5 YouTube rows at a time
-    var roosterTeethBatchSize = 1000; // Process 1000 RoosterTeeth rows at a time
+    // Batch sizes -----------------------------------------------------------------------------------------------------------------
+    var youtubeBatchSize = 50; // Process X YouTube rows at a time
+    var roosterTeethBatchSize = 1000; // Process X RoosterTeeth rows at a time
     logToSheet(`Set YouTube batch size to ${youtubeBatchSize} and RoosterTeeth batch size to ${roosterTeethBatchSize}.`);
 
     // Get YouTube data and skip header row
@@ -77,195 +73,247 @@ function organizeData() {
     youtubeData.shift();
 
     // Define column index for show name in RoosterTeeth sheet (column E)
-    var showNameColumnIndex = 4; // Zero-based index, so E is 4
+    var showNameColumnIndex = 4;
     //   logToSheet("Defined column index for show name.");
 
-    // Define the desired show name for comparison
-    var desiredShowName = "VS";
-    logToSheet("Set desired show name");
+    // Define the desired show name for comparison ----------------------------------------------------------------------------------------
+    var desiredShowName = "On The Spot";
+    logToSheet(`Set desired show name: ${desiredShowName}`);
 
     // Process YouTube data in batches of 5 rows
-while (lastYouTubeRow < youtubeData.length) {
-    // Get the end index for the current batch of YouTube rows
-    var youtubeEndIndex = Math.min(lastYouTubeRow + youtubeBatchSize, youtubeData.length);
+    while (lastYouTubeRow < youtubeData.length) {
+        // Get the end index for the current batch of YouTube rows
+        var youtubeEndIndex = Math.min(lastYouTubeRow + youtubeBatchSize, youtubeData.length);
 
-    // Log the start of a new batch of YouTube rows
-    logToSheet(`Processing new batch of YouTube rows from index ${lastYouTubeRow} to ${youtubeEndIndex}.`);
+        // Log the start of a new batch of YouTube rows
+        logToSheet(`Processing new batch of YouTube rows from index ${lastYouTubeRow} to ${youtubeEndIndex}.`);
 
-    // Array to hold matches for the current batch of YouTube rows
-    var outputData = [];
+        // Array to hold matches for the current batch of YouTube rows
+        var outputData = [];
 
-    // Process each YouTube row in the current batch
-    for (let i = lastYouTubeRow; i < youtubeEndIndex; i++) {
-        var youtubeRow = youtubeData[i];
-        var youtubeDate = new Date(youtubeRow[3]);
-        var youtubeURL = youtubeRow[1];
+        // Process each YouTube row in the current batch
+        for (let i = lastYouTubeRow; i < youtubeEndIndex; i++) {
+            var yearStartRows = createindex ();
+            var youtubeRow = youtubeData[i];
+            var youtubeDate = new Date(youtubeRow[3]);
+            var youtubeURL = youtubeRow[1];
+            var currentYTRowYear = youtubeDate.getFullYear();
+            var startingRTRow = yearStartRows[currentYTRowYear];
 
-        // Initialize match found flag
-        let matchFound = false;
+            // Get the next year from the index
+            var nextYear = currentYTRowYear + 1;
+            // Determine the ending row for the next year
+            var endingRTRow = yearStartRows[nextYear];
 
-        // Log details of the current YouTube row being processed
-        //         logToSheet(`Processing YouTube row at index ${i}: URL = ${youtubeURL}, Date = ${youtubeDate.toISOString()}.`);
+            // logToSheet(`Year to find is ${youtubeDate}, which is on row ${startingRTRow}, Ending RoosterTeeth row for next year (${nextYear}) is ${endingRTRow}`);
+            logToSheet(`current youtube row is ${i}, containing the information ${youtubeRow}`)
 
-        // Process each batch of RoosterTeeth data in the current batch
-        while (lastRoosterTeethRow <= roosterTeethSheet.getLastRow()) {
-            // Define the range of RoosterTeeth batch
-            var roosterTeethEndIndex = Math.min(lastRoosterTeethRow + roosterTeethBatchSize - 1, roosterTeethSheet.getLastRow());
-            var roosterTeethDataRange = roosterTeethSheet.getRange(lastRoosterTeethRow, 1, roosterTeethEndIndex - lastRoosterTeethRow + 1, 6);
-            var roosterTeethData = roosterTeethDataRange.getValues();
-            var roosterTeethBackgroundColors = roosterTeethDataRange.getBackgrounds();
 
-            // Log details of the current batch of RoosterTeeth rows being processed
-            //     logToSheet(`Processing RoosterTeeth rows from index ${lastRoosterTeethRow} to ${roosterTeethEndIndex}.`);
 
-            // Process each RoosterTeeth row in the current batch
-            for (let j = 0; j < roosterTeethData.length; j++) {
-                var roosterTeethRow = roosterTeethData[j];
-                var roosterTeethDate = new Date(roosterTeethRow[3]);
-                var roosterTeethShowName = roosterTeethRow[showNameColumnIndex];
-                var roosterTeethURL = roosterTeethRow[1];
-                var roosterTeethDateBackgroundColor = roosterTeethBackgroundColors[j][3];
+            // Initialize match found flag
+            let matchFound = false;
 
-                // Log details of the current RoosterTeeth row being processed remove the // in the next line to activate
-                // logToSheet(`Processing RoosterTeeth row at index ${lastRoosterTeethRow + j}: Date Cell Background Color = ${roosterTeethDateBackgroundColor}.`);
+            // Log details of the current YouTube row being processed
+            //  logToSheet(`Processing YouTube row at index ${i}: URL = ${youtubeURL}, Date = ${youtubeDate.toISOString()}.`);
 
-                // Skip RoosterTeeth rows where the date cell has a green background
-                if (roosterTeethDateBackgroundColor === "#008000") {
-                    //     logToSheet(`Skipping RoosterTeeth row at index ${lastRoosterTeethRow + j} since its already been matched.`);
-                    continue; // Skip this RoosterTeeth row because the date cell is green
-                }
+          // logToSheet("begining RT loop");
+    var currentRTRow = startingRTRow; // Initialize currentRTRow with startingRTRow
+          
+          
+          
+          // Process RT data Batch Loop
+    while (currentRTRow <= endingRTRow) {
+          // logToSheet("RT loop has begun or restarted");
 
-                // Compare YouTube and RoosterTeeth data
-                          if (roosterTeethShowName === desiredShowName && Math.abs(youtubeDate - roosterTeethDate) <= 2 * 24 * 60 * 60 * 1000) {
-                              // Set background color of RoosterTeeth date cell to green
-                              roosterTeethSheet.getRange(lastRoosterTeethRow + j, 4).setBackground("green");
-                              logMatchToSheet(`Match found!: YouTube URL = ${youtubeURL}, RoosterTeeth URL = ${roosterTeethURL}`);
+          // Define the range of RoosterTeeth batch starting from the matched row
+          var roosterTeethEndIndex = Math.min(currentRTRow + roosterTeethBatchSize - 1, roosterTeethSheet.getLastRow());
+          //logToSheet(`roosterteeth end index is ${roosterTeethEndIndex}, `);
+          var roosterTeethDataRange = roosterTeethSheet.getRange(currentRTRow, 1, roosterTeethEndIndex - currentRTRow + 1, 6);
+          var roosterTeethData = roosterTeethDataRange.getValues();
+          var roosterTeethBackgroundColors = roosterTeethSheet.getRange(startingRTRow, 4, endingRTRow - startingRTRow + 1).getBackgrounds();
+          // logToSheet("rt color array complete")
 
-                              // Add YouTube URL and matching RoosterTeeth URL to output data
-                              outputData.push([youtubeURL, roosterTeethURL]);
+          // Log details of the current batch of RoosterTeeth rows being processed
+          // logToSheet(`Processing RoosterTeeth rows from index ${currentRTRow} to ${roosterTeethEndIndex}. ending at ${endingRTRow}`);
 
-                              // Update the background color in the array
-                              roosterTeethDataRange.getCell(j + 1, 4).setBackground("green");
+          // Process each RoosterTeeth row in the current batch
+          for (let j = 0; j < roosterTeethData.length; j++) {
+              var roosterTeethRow = roosterTeethData[j];
+              var roosterTeethDate = new Date(roosterTeethRow[3]);
+              var roosterTeethShowName = roosterTeethRow[showNameColumnIndex];
+              var roosterTeethURL = roosterTeethRow[1];
+              var roosterTeethDateBackgroundColor = roosterTeethBackgroundColors[j][0];
 
-                              // Break the loop as a match has been found
-                              matchFound = true;
-                              deleteRTProperties();
-                              //     logToSheet ('Reseting RT Rows')
-                              break;
-                          }
+              // Log details of the current RoosterTeeth row being processed
+              // logToSheet(`Processing RoosterTeeth row at index ${currentRTRow + j}: youtube date to find = ${youtubeDate}. from youtube row ${currentRTRow}, +`);
 
+              // Skip RoosterTeeth rows where the date cell has a green background
+              if (roosterTeethDateBackgroundColor === "#008000") {
+                //logToSheet(`Date checking is ${roosterTeethDate}`);
+                //logToSheet(`date is already green meaning a match is found skipping RT row ${currentRTRow}`);
+                  continue; // Skip this RoosterTeeth row because the date cell is green
               }
 
-            // If match found, stop searching further for the current YouTube row
-            if (matchFound) {
-                //  logToSheet(`Match found for YouTube row at index ${i}. Stopping search in Current RoosterTeeth batch.`);
-                break;
+              // Compare YouTube and RoosterTeeth data  ------------------------------------------------------------------------------------------------------------------------------------------------
+              if (roosterTeethShowName === desiredShowName && Math.abs(youtubeDate - roosterTeethDate) <= 1 * 24 * 60 * 60 * 1000) {
+                
+                  // Set background color of RoosterTeeth and Youtube Date cell to green
+                  //logToSheet(`current youtube row is ${i}`)
+                  // youtubeSheet.getRange(i + 2, 4).setBackground("green");
+                   roosterTeethSheet.getRange(currentRTRow + j, 4).setBackground("green");
+                   logMatchToSheet(`Match found!: YouTube URL = ${youtubeURL}, RoosterTeeth URL = ${roosterTeethURL}`);
+
+                  // Add YouTube URL and matching RoosterTeeth URL to output data
+                  outputData.push([youtubeURL, roosterTeethURL]);
+
+                  // Update the background color in the array
+                  roosterTeethSheet.getRange(currentRTRow + j, 4).setBackground("green");
+                  roosterTeethDataRange.getCell(j + 1, 4).setBackground("green");
+
+                  // Break the loop as a match has been found
+                  matchFound = true;
+                  deleteRTProperties();
+                  //logToSheet ('Reseting RT Rows')
+                  break;
             }
+          }
 
-            // Move to the next batch of RoosterTeeth rows if a match is not found from current batch
-            // logToSheet ("moving to next batch of rt rows");
-            lastRoosterTeethRow = roosterTeethEndIndex + 1;
+          // If match found, stop searching further for the current YouTube row
+          if (matchFound) {
+          //  logToSheet(`Match found for YouTube row at index ${i}. Stopping search in Current RoosterTeeth batch.`);
+              break;
+          }
 
-            // Drop the data from the current batch 
-            roosterTeethData = [];
-           //  logToSheet(`Updated lastRoosterTeethRow to ${lastRoosterTeethRow}.`);
-        }
+          // Move to the next batch of RoosterTeeth rows if a match is not found from current batch
+          // logToSheet ("moving to next batch of rt rows");
+          currentRTRow += roosterTeethBatchSize;
+         // logToSheet(`no match found for current RT batch ending at row  ${roosterTeethRow} `)
 
-          // Handle no match case
-        if (!matchFound) {
-           //  logToSheet(`No match found for YouTube row at index ${i}. Adding "No match found" to output data.`);
-            outputData.push(["No match found", "No match found"]);
-            deleteRTProperties();
-           //   logToSheet('Resetting RT Rows');
-            // Reset lastRoosterTeethRow to 0 to start from the beginning of the RoosterTeeth data
-            lastRoosterTeethRow = 1;
-            // Drop the data from the current batch for garbage collection
-            roosterTeethData = [];
-            //  logToSheet(`Reset lastRoosterTeethRow to 0.`);
-        }
-    }
+          // Drop the data from the current batch 
+          roosterTeethData = [];
+          // logToSheet(`Updated currentRTRow to ${currentRTRow}.`);
+      }
 
-    // Batch update the output sheet with matches from the current YouTube batch
-    logToSheet(`Youtube batch complete updating output sheet starting at row ${outputStartRow}.`);
-    outputSheet.getRange(outputStartRow, 1, outputData.length, 2).setValues(outputData);
-    outputStartRow += outputData.length; // Update the starting row for the next batch of matches
+        // Handle no match case
+      if (!matchFound) {
+          logToSheet(`No Match Found at current youtube row ${i}`);
+          outputData.push([`${youtubeURL}`, `No match found`]);
+          //deleteRTProperties();
+          //logToSheet('Resetting RT Rows');
+          // Reset lastRoosterTeethRow to 0 to start from the beginning of the RoosterTeeth data
+          startingRTRow = 3;
+      }
 
-    logToSheet("Batch update completed.");  // Updated outputStartRow to ${outputStartRow}.`   --  add this back into the left log for debuggins when needed
+      
+       }
 
-    // Update YouTube row index for the next batch of rows
-    lastYouTubeRow = youtubeEndIndex;
-    // logToSheet(`Updated lastYouTubeRow to ${lastYouTubeRow} for the next batch of YouTube rows.`);
+          // Batch update the output sheet with matches from the current YouTube batch
+          //logMatchToSheet(`Youtube batch complete updating output sheet starting at row ${outputStartRow}.`);
+          outputSheet.getRange(outputStartRow, 1, outputData.length, 2).setValues(outputData);
+          outputStartRow += outputData.length; // Update the starting row for the next batch of matches
 
-    // Reset outputData array for the next YouTube batch
-    outputData = [];
+          logToSheet("Batch update completed.");  // Updated outputStartRow to ${outputStartRow}.`   --  add this back into the left log for debuggins when needed
 
-    // Update last processed row indices in properties
-    // logToSheet(`Updating properties: lastYouTubeRow = ${lastYouTubeRow}, lastRoosterTeethRow = ${lastRoosterTeethRow}.`);
-    properties.setProperty('lastYouTubeRow', lastYouTubeRow.toString());
-    properties.setProperty('lastRoosterTeethRow', lastRoosterTeethRow.toString());
+          // Update YouTube row index for the next batch of rows
+          lastYouTubeRow = youtubeEndIndex;
+          // logToSheet(`Updated lastYouTubeRow to ${lastYouTubeRow} for the next batch of YouTube rows.`);
 
-    logToSheet(`Properties updated. Ending current iteration of loop.`);
-   
-   logToSheet ("creating trigger to pause function")
-   setOrganizeDataTrigger ();
-    
+          // Reset outputData array for the next YouTube batch
+          outputData = [];
+
+          // Update last processed row indices in properties
+          // logToSheet(`Updating properties: lastYouTubeRow = ${lastYouTubeRow}, lastRoosterTeethRow = ${lastRoosterTeethRow}.`);
+          properties.setProperty('lastYouTubeRow', lastYouTubeRow.toString());
+          //properties.setProperty('lastRoosterTeethRow', lastRoosterTeethRow.toString());  - this is currently unused anymore
+
+          logToSheet(`Properties updated. Ending current iteration of loop.`);
+        
+          //logToSheet ("creating trigger to pause function")
+          setrebootTrigger ();
+          logToSheet("freeze process trigger set, freezing process to avoid timeout")
+          return;
+          
+
+     }
+
+
+   // Processing complete , reset dropdown to stop
+     logToSheet("Done???.");
+     outputSheet.getRange("C1").setValue("Stop");
+     deleteLastRowProperties();
+     manageTriggers();
 
 }
 
-
-    // Processing complete
-    logToSheet("Done???.");
-    // Reset the dropdown to Stop
-    outputSheet.getRange("C1").setValue("Stop");
-   deleteLastRowProperties();
+// Function that creates my custom index tracking the RT Years and what row they start on
+function createindex(){
+  //create an object where the keys are the years and row number associated
+  const yearStartRows = {
+    2009: 343,
+    2010: 734,
+    2011: 1360,
+    2012: 2900,
+    2013: 5117,
+    2014: 7096,
+    2015: 9029,
+    2016: 11462,
+    2017: 14951,
+    2018: 18808,
+    2019: 22851,
+    2020: 27413,
+    2021: 32465,
+    2022: 36752,
+    2023: 39807,
+    2024: 42015,
+  };
+  return yearStartRows;
 }
 
-//delete all saved data of RT and YT current rows in the main function
+// Function to delete all saved data of RT and YT current rows in the main function
 function deleteLastRowProperties() {
-    // Access the user properties
     const properties = PropertiesService.getUserProperties();
 
     // Delete the properties for last YouTube row and last RoosterTeeth row
     properties.deleteProperty('lastYouTubeRow');
     properties.deleteProperty('lastRoosterTeethRow');
-
-    // Log the action (optional)
     logToSheet("Deleted lastYouTubeRow and lastRoosterTeethRow properties.");
 }
 
-//delete all saved data of RT Rows current rows
+// Function to delete all saved data of RT Rows current rows only --- this is now unused but im keeping it here just incase
 function deleteRTProperties() {
-    // Access the user properties
     const properties = PropertiesService.getUserProperties();
-
-    // Delete the properties forlast RoosterTeeth row
     properties.deleteProperty('lastRoosterTeethRow');
 }
 
-function setOrganizeDataTrigger() {
-    // Manage triggers to ensure only one active trigger
-    manageTriggers();
 
-    // Set a time-based trigger to continue processing after 1 seconds
+// Function to set a timmed trigger to start the main function again. 
+function setrebootTrigger() {
+    //Manage triggers to ensure only one active trigger  -- currently no longer needed
+    //manageTriggers(); disable to se if this speeds things up 
+
+    //Set a time-based trigger to continue processing after 1/2 seconds
     ScriptApp.newTrigger('organizeData')
         .timeBased()
-        .after(2000)
+        .after(500)
         .create();
 
-    // logToSheet("Freeze data trigger set.");
+    //logToSheet("Freeze process trigger created.");
 }
 
+
+// Function to delete existing triggers if any exist for the main function, this way it doesnt delete the one i made for the onEditinstallable function at the start
 function manageTriggers() {
-    // Delete existing triggers if any
     var triggers = ScriptApp.getProjectTriggers();
-    triggers.forEach((trigger) => {
+     triggers.forEach((trigger) => {
         if (trigger.getHandlerFunction() === 'organizeData') {
             ScriptApp.deleteTrigger(trigger);
             // logToSheet("Deleted existing trigger.");
         }
     });
 }
-// log matches as green 
+
+
+// Function to log messages with a green background, used to highligt matches or specific log you want to see when debugging
 function logMatchToSheet(message) {
     const logsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Logs');
     const nextAvailableRow = logsSheet.getLastRow() + 1;
@@ -278,7 +326,7 @@ function logMatchToSheet(message) {
     logRange.setBackground('#CCFFCC'); // Set background color to light green
 }
 
-
+//   Function to Log Messages
 function logToSheet(message) {
     const logsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Logs');
     const nextAvailableRow = logsSheet.getLastRow() + 1;
