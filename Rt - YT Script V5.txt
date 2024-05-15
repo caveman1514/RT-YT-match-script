@@ -26,7 +26,7 @@ function onEditInstallable(e) {
         organizeData();
     }
 
-    // Edit to clear Output, Logs, and Row Data
+    // Edit to clear Output, Logs, and Row Data and old execution
     if (editedRange.getSheet().getName() === "Output" && editedRange.getA1Notation() === "D1") {
         if (editedValue === "TRUE") {
             // Clear everything in Output sheet after row 2
@@ -35,6 +35,7 @@ function onEditInstallable(e) {
             logsSheet.clear();
             logToSheet("Cleared output and log sheet.");
             deleteLastRowProperties();
+            //deleteOldExecutions(); --- doesnt work :/
         }
     }
 }
@@ -64,7 +65,7 @@ function organizeData() {
 
     // Batch sizes -----------------------------------------------------------------------------------------------------------------
     var youtubeBatchSize = 50; // Process X YouTube rows at a time
-    var roosterTeethBatchSize = 1000; // Process X RoosterTeeth rows at a time
+    var roosterTeethBatchSize = 1500; // Process X RoosterTeeth rows at a time
     logToSheet(`Set YouTube batch size to ${youtubeBatchSize} and RoosterTeeth batch size to ${roosterTeethBatchSize}.`);
 
     // Get YouTube data and skip header row
@@ -116,22 +117,19 @@ function organizeData() {
             // Log details of the current YouTube row being processed
             //  logToSheet(`Processing YouTube row at index ${i}: URL = ${youtubeURL}, Date = ${youtubeDate.toISOString()}.`);
 
-          // logToSheet("begining RT loop");
+           //logToSheet("begining RT loop");
     var currentRTRow = startingRTRow; // Initialize currentRTRow with startingRTRow
-          
-          
-          
           // Process RT data Batch Loop
     while (currentRTRow <= endingRTRow) {
-          // logToSheet("RT loop has begun or restarted");
+         // logToSheet("RT loop has begun or restarted");
 
-          // Define the range of RoosterTeeth batch starting from the matched row
+          // Define the range of RoosterTeeth batch starting from the starting row var
           var roosterTeethEndIndex = Math.min(currentRTRow + roosterTeethBatchSize - 1, roosterTeethSheet.getLastRow());
           //logToSheet(`roosterteeth end index is ${roosterTeethEndIndex}, `);
           var roosterTeethDataRange = roosterTeethSheet.getRange(currentRTRow, 1, roosterTeethEndIndex - currentRTRow + 1, 6);
           var roosterTeethData = roosterTeethDataRange.getValues();
           var roosterTeethBackgroundColors = roosterTeethSheet.getRange(startingRTRow, 4, endingRTRow - startingRTRow + 1).getBackgrounds();
-          // logToSheet("rt color array complete")
+         // logToSheet("rt color array complete")
 
           // Log details of the current batch of RoosterTeeth rows being processed
           // logToSheet(`Processing RoosterTeeth rows from index ${currentRTRow} to ${roosterTeethEndIndex}. ending at ${endingRTRow}`);
@@ -145,7 +143,7 @@ function organizeData() {
               var roosterTeethDateBackgroundColor = roosterTeethBackgroundColors[j][0];
 
               // Log details of the current RoosterTeeth row being processed
-              // logToSheet(`Processing RoosterTeeth row at index ${currentRTRow + j}: youtube date to find = ${youtubeDate}. from youtube row ${currentRTRow}, +`);
+              //logToSheet(`Processing RoosterTeeth row at index ${currentRTRow + j}: youtube date to find = ${youtubeDate}. from youtube row ${currentRTRow}, +`);
 
               // Skip RoosterTeeth rows where the date cell has a green background
               if (roosterTeethDateBackgroundColor === "#008000") {
@@ -159,7 +157,7 @@ function organizeData() {
                 
                   // Set background color of RoosterTeeth and Youtube Date cell to green
                   //logToSheet(`current youtube row is ${i}`)
-                  // youtubeSheet.getRange(i + 2, 4).setBackground("green");
+                   youtubeSheet.getRange(i + 2, 4).setBackground("green");
                    roosterTeethSheet.getRange(currentRTRow + j, 4).setBackground("green");
                    logMatchToSheet(`Match found!: YouTube URL = ${youtubeURL}, RoosterTeeth URL = ${roosterTeethURL}`);
 
@@ -172,7 +170,7 @@ function organizeData() {
 
                   // Break the loop as a match has been found
                   matchFound = true;
-                  deleteRTProperties();
+                  // deleteRTProperties();
                   //logToSheet ('Reseting RT Rows')
                   break;
             }
@@ -180,7 +178,7 @@ function organizeData() {
 
           // If match found, stop searching further for the current YouTube row
           if (matchFound) {
-          //  logToSheet(`Match found for YouTube row at index ${i}. Stopping search in Current RoosterTeeth batch.`);
+           //logToSheet(`Match found for YouTube row at index ${i}. Stopping search in Current RoosterTeeth batch.`);
               break;
           }
 
@@ -191,18 +189,20 @@ function organizeData() {
 
           // Drop the data from the current batch 
           roosterTeethData = [];
+          roosterTeethBackgroundColors = [];
           // logToSheet(`Updated currentRTRow to ${currentRTRow}.`);
       }
 
         // Handle no match case
       if (!matchFound) {
-          logToSheet(`No Match Found at current youtube row ${i}`);
+          logNoMatchToSheet(`No Match Found at current youtube row ${i}`);
           outputData.push([`${youtubeURL}`, `No match found`]);
           //deleteRTProperties();
           //logToSheet('Resetting RT Rows');
           // Reset lastRoosterTeethRow to 0 to start from the beginning of the RoosterTeeth data
           startingRTRow = 3;
-      }
+          
+          }
 
       
        }
@@ -232,9 +232,8 @@ function organizeData() {
           setrebootTrigger ();
           logToSheet("freeze process trigger set, freezing process to avoid timeout")
           return;
-          
-
-     }
+      
+    }
 
 
    // Processing complete , reset dropdown to stop
@@ -288,13 +287,12 @@ function deleteRTProperties() {
 
 // Function to set a timmed trigger to start the main function again. 
 function setrebootTrigger() {
-    //Manage triggers to ensure only one active trigger  -- currently no longer needed
-    //manageTriggers(); disable to se if this speeds things up 
+    //manageTriggers(); disabled to se if this speeds things up FYI it didnt :/
 
-    //Set a time-based trigger to continue processing after 1/2 seconds
+    //Set a time-based trigger to continue processing after 1 seconds
     ScriptApp.newTrigger('organizeData')
         .timeBased()
-        .after(500)
+        .after(1000)
         .create();
 
     //logToSheet("Freeze process trigger created.");
@@ -312,6 +310,23 @@ function manageTriggers() {
     });
 }
 
+function deleteOldExecutions() {
+  var processes = ScriptApp.getProcesses();
+  var oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+  for (var i = 0; i < processes.length; i++) {
+    var process = processes[i];
+    var processStartTime = process.getStartTime();
+
+    if (processStartTime < oneDayAgo) {
+      process.remove();
+      console.log('Deleted execution started at: ' + processStartTime);
+    }
+  }
+}
+
+
 
 // Function to log messages with a green background, used to highligt matches or specific log you want to see when debugging
 function logMatchToSheet(message) {
@@ -326,6 +341,20 @@ function logMatchToSheet(message) {
     logRange.setBackground('#CCFFCC'); // Set background color to light green
 }
 
+
+// Function to log messages with a red background, used to highligt matches or specific log you want to see when debugging
+function logNoMatchToSheet(message) {
+    const logsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Logs');
+    const nextAvailableRow = logsSheet.getLastRow() + 1;
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy hh:mm:ss a');
+    const logEntry = `${timestamp}: ${message}`;
+    const logRange = logsSheet.getRange(nextAvailableRow, 1);
+    
+    // Set the log entry and the background color
+    logRange.setValue(logEntry);
+    logRange.setBackground('#ea9999'); // Set background color to light green
+}
+
 //   Function to Log Messages
 function logToSheet(message) {
     const logsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Logs');
@@ -334,3 +363,4 @@ function logToSheet(message) {
     const logEntry = `${timestamp}: ${message}`;
     logsSheet.getRange(nextAvailableRow, 1).setValue(logEntry);
 }
+
