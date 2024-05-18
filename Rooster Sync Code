@@ -54,6 +54,13 @@ function onEditInstallable(e) {
         }
     }
 
+    if (editedRange.getSheet().getName() === "Controls" && editedRange.getA1Notation() === "L42") {
+        if (editedValue === "TRUE") {
+            resetRoosterTeethColumnDColor();
+            controlsSheet.getRange("L42").setValue(false);
+        }
+    }
+
 
 
 
@@ -158,6 +165,7 @@ function organizeData() {
             var nextYear = currentYTRowYear + 1;
             var endingRTRow = yearStartRows[nextYear];
             var currentRTRow = startingRTRow;
+            var rtColorKey = createRTColorKey(startingRTRow, endingRTRow, roosterTeethSheet)
             var indexInColorArray = i - lastYouTubeRow;
             var youtubeDateColor = ytDateBackgroundColors[indexInColorArray][0]; 
             //logToSheet(`first batch is ${isFirstBatch} before YT color check`);
@@ -165,26 +173,30 @@ function organizeData() {
             //logToSheet(`Row ${lastYouTubeRow + i}: Background color - ${ytDateBackgroundColors[i][0]}, for youtubebackgroundcolor range ${ytDateBackgroundColors}`);   // this If Loop is used to log every color in the YT color array for debugging
             //}
 
-            if (youtubeDateColor === "#b6d7a8"){
-              logToSheet(`Youtube vid ${youtubeVidTitle}, is matched skiping `)
+            if (youtubeDateColor === "#008000"){
+              logToSheet(`YT VIDEO:   ${youtubeVidTitle}, IS ALREADY MATCHED, SKIPPING..`)
               continue; 
             }
 
-            // logToSheet(`Year to find is ${youtubeDate}, which is on row ${startingRTRow}, Ending RoosterTeeth row for next year (${nextYear}) is ${endingRTRow}`);
+            //logToSheet(`Year to find is ${youtubeDate}, which is on row ${startingRTRow}, Ending RoosterTeeth row for next year (${nextYear}) is ${endingRTRow}`);
             // logToSheet(`current youtube row is ${youtubeRow}`)
 
 
 
             // Initialize match found flag
             let matchFound = false;
-            // logToSheet(`Processing YouTube row at index ${i}: URL = ${youtubeURL}, Date = ${youtubeDate.toISOString()} begining RT Loop.`);
+            logToSheet(`Processing YouTube Video ${youtubeVidTitle},  at  row   ${i},   from date =    ${youtubeDate.toISOString()} begining search.`);
 
            // Process RT Batch aka Outer Loop
           while (currentRTRow <= endingRTRow + 100) {   // Added the + 100 so that it can find matches that overlap over years
                 var roosterTeethEndIndex = Math.min(currentRTRow + roosterTeethBatchSize - 1, roosterTeethSheet.getLastRow());
                 var roosterTeethDataRange = roosterTeethSheet.getRange(currentRTRow, 1, roosterTeethEndIndex - currentRTRow + 1, 6);
                 var roosterTeethData = roosterTeethDataRange.getValues();
-                var roosterTeethBackgroundColors = roosterTeethSheet.getRange(startingRTRow, 4, endingRTRow - startingRTRow + 1).getBackgrounds();
+
+
+
+
+
 
                 // Log details of the current batch of RoosterTeeth rows being processed
                 // logToSheet(`Processing RoosterTeeth rows from index ${currentRTRow} to ${roosterTeethEndIndex}. ending at ${endingRTRow}`);
@@ -196,7 +208,25 @@ function organizeData() {
                     var roosterTeethShowName = roosterTeethRow[showNameColumnIndex];
                     var roosterTeethURL = roosterTeethRow[1];
                     var roosterteehVidTitle =roosterTeethRow[0]
-                    var roosterTeethDateBackgroundColor = roosterTeethBackgroundColors[j][0];
+                    var actualRTRow = currentRTRow + j;
+
+                    //logToSheet(`current row is ${actualRTRow}`)
+                    var roosterTeethDateBackgroundColor = rtColorKey[actualRTRow];
+                    //logToSheet(`Fetched background colors count for year ${currentYTRowYear}: ${Object.keys(rtColorKey).length}`);
+
+                    //let first20Values = Object.keys(rtColorKey).slice(0, 20).map(key => `Row ${key}: ${rtColorKey[key]}`).join(", ");
+                    //logToSheet(`First 20 background colors: ${first20Values}`);
+                    //logNoMatchToSheet(`CURRENT RT VIDEO IS ${roosterteehVidTitle},    RELEASED ON    ${roosterTeethDate},        DATES COLOR IS  ${roosterTeethDateBackgroundColor}`)
+
+                    // Skip RoosterTeeth rows where the date cell has a green background
+                    if (roosterTeethDateBackgroundColor === "#008000") {
+                      //logToSheet(`Date checking is ${roosterTeethDate}`);
+                     //logToSheet(`DATE IS ALREADY GREEN SKIPPING RT VIDEO ${roosterteehVidTitle}`);
+                        continue; // Skip this RoosterTeeth row because the date cell is green
+                    }       
+
+
+
 
                     // Log details of the current RoosterTeeth row being processed
                     //logToSheet(`Processing RoosterTeeth row at index ${currentRTRow + j}: youtube date to find = ${youtubeDate}. from youtube row ${currentRTRow}, +`);
@@ -209,27 +239,20 @@ function organizeData() {
                       break;
                      }
 
-                    // Skip RoosterTeeth rows where the date cell has a green background
-                    if (roosterTeethDateBackgroundColor === "#b6d7a8") {
-                      //logToSheet(`Date checking is ${roosterTeethDate}`);
-                      //logToSheet(`date is already green meaning a match is found skipping RT row ${currentRTRow}`);
-                        continue; // Skip this RoosterTeeth row because the date cell is green
-                    }
 
                     // IF YT and RT have a MATCH  ------------------------------------------------------------------------------------------------------------------------------------------------
                     if (roosterTeethShowName === desiredShowName && Math.abs(youtubeDate - roosterTeethDate) <= timeInterval) {
                       
                         // Set background color of RoosterTeeth and Youtube Date cell to green
-                        youtubeSheet.getRange(i + 2, 4).setBackground("#b6d7a8");
-                        roosterTeethSheet.getRange(currentRTRow + j, 4).setBackground("#b6d7a8");
-                        logMatchToSheet(`Potential Match Found! for Youtube Video ${youtubeVidTitle},`);
+                        youtubeSheet.getRange(i + 2, 4).setBackground("green");
+                        roosterTeethSheet.getRange(currentRTRow + j, 4).setBackground("green");
+                        logMatchToSheet(`POTENTIAL MATCH FOUND FOR YT VIDEO  ${youtubeVidTitle},    WITH RT VIDEO  ${roosterteehVidTitle}`);
 
                         // Add YouTube URL and matching RoosterTeeth URL to output data
                         outputData.push([youtubeVidTitle, youtubeURL, roosterteehVidTitle, roosterTeethURL]);
 
                         // Update the background color in the RT Color array 
-                        roosterTeethSheet.getRange(currentRTRow + j, 4).setBackground("#b6d7a8");
-                        roosterTeethDataRange.getCell(j + 1, 4).setBackground("#b6d7a8");
+                        roosterTeethDataRange.getCell(j + 1, 4).setBackground("green");
 
                         // Break the loop as a match has been found
                         matchFound = true;
@@ -239,20 +262,23 @@ function organizeData() {
 
                 // If match found, stop searching further for the current YouTube row
                 if (matchFound) {
+                  //roosterTeethBackgroundColors = [];
                     break;
                   }
 
                 // Move to the next batch of RoosterTeeth rows if a match is not found and dump all data from current batch
+                //logToSheet("no match found in this batch moving to another 1500")
                 currentRTRow += roosterTeethBatchSize;
-                roosterTeethData = [];
-                roosterTeethBackgroundColors = [];
+                //roosterTeethData = [];
+                //roosterTeethBackgroundColors = [] - deactivating while i try a new way of grabbing the color data
+
           }
 
       // Handle a no match is found case
       if (!matchFound) {
         // Only add no match found data if Rooster Sync is running through the list for the first time. 
           outputData.push([`${youtubeVidTitle}`, `${youtubeURL}`, `No match found`, `no match found`]);
-          logNoMatchToSheet(`No Match Found at current youtube row ${i}`);
+          logNoMatchToSheet(`NO MATCH FOUND FOR YT VIDEO  ${youtubeVidTitle}`);
             // give starting row an arbituary value above 0 but lower than i dont remember because is isnt here is breaks THIS IS WHAT CHANGE LOGS ARE FOR AHAAHHHAAHAHAHAHAHA its 1am...
           startingRTRow = 3;  
         }
@@ -278,6 +304,7 @@ function organizeData() {
     // Reset outputData array for the next YouTube batch
     outputData = [];
     ytDateBackgroundColors = [];
+    //roosterTeethBackgroundColors = [];
 
     // Update last processed row indices in properties
     // logToSheet(`Updating properties: lastYouTubeRow = ${lastYouTubeRow}, lastRoosterTeethRow = ${lastRoosterTeethRow}.`);
@@ -303,8 +330,24 @@ function organizeData() {
   manageTriggers();
   setEndOfProcessRow();
   scriptProperties.setProperty('RoosterSyncRan?', 'true');
+  //roosterTeethBackgroundColors = [];
   logToSheet("Process is done!");
 }
+
+//function to create a RT vdate color index where the row is the key and the date color is the info it gets 
+function createRTColorKey(startRow, endRow, sheet) {
+    // +101 to include the next year's overlap of 100 rows in the range fetch
+    var backgroundsRange = sheet.getRange(startRow, 4, endRow - startRow + 101, 1);
+    var backgrounds = backgroundsRange.getBackgrounds();
+    var colorKey = {};
+
+    // Populate the colorKey object
+    for (let i = 0; i < backgrounds.length; i++) {
+        colorKey[startRow + i] = backgrounds[i][0];  // Assuming background colors are fetched from a single column
+    }
+    return colorKey;
+}
+
 
 
 
@@ -332,20 +375,32 @@ function createindex(){
   return yearStartRows;
 }
 
-
+// reset TY date column color
 function resetYoutubeColumnDColor() {
     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     var youtubeSheet = spreadsheet.getSheetByName("Youtube");
-
-    // Assuming the data starts from row 1 and column D is the 4th column
+    var lastRow = youtubeSheet.getLastRow();
+    if (lastRow > 0) {
+        var columnDRange = youtubeSheet.getRange(1, 4, lastRow);
+        columnDRange.setBackground('#ffffff');
+    }
+}
+// reset RT date column color
+function resetRoosterTeethColumnDColor() {
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var youtubeSheet = spreadsheet.getSheetByName("RoosterTeeth");
     var lastRow = youtubeSheet.getLastRow();
     if (lastRow > 0) {
         var columnDRange = youtubeSheet.getRange(1, 4, lastRow);
         columnDRange.setBackground('#ffffff');
     }
 
-    Logger.log("Column D background color reset to white.");
 }
+
+
+
+
+
 
 
 
@@ -467,3 +522,6 @@ function logToSheet(message) {
     const logEntry = `${timestamp}: ${message}`;
     logsSheet.getRange(nextAvailableRow, 1).setValue(logEntry);
 }
+
+
+
