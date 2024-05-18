@@ -172,6 +172,12 @@ function organizeData() {
             //for (let i = 0; i < ytDateBackgroundColors.length; i++) {
             //logToSheet(`Row ${lastYouTubeRow + i}: Background color - ${ytDateBackgroundColors[i][0]}, for youtubebackgroundcolor range ${ytDateBackgroundColors}`);   // this If Loop is used to log every color in the YT color array for debugging
             //}
+                    // Stop if drop down changed to stop
+                if (scriptProperties.getProperty('runOrganizeData') === 'false') {
+               logToSheet("Process stopped by user.");
+               return;
+               }
+
 
             if (youtubeDateColor === "#008000"){
               logToSheet(`YT VIDEO:   ${youtubeVidTitle}, IS ALREADY MATCHED, SKIPPING..`)
