@@ -34,7 +34,7 @@ function onEditInstallable(e) {
        }
 
     // Edit to clear Output, Logs, and Row Data and old execution
-    if (editedRange.getSheet().getName() === "Controls" && editedRange.getA1Notation() === "L20") {
+    if (editedRange.getSheet().getName() === "Controls" && editedRange.getA1Notation() === "M20") {
         if (editedValue === "TRUE") {
             // Clear everything in Output sheet after row 2
             var rangeToClear = outputSheet.getRange("A2:G" + outputSheet.getMaxRows());
@@ -44,22 +44,34 @@ function onEditInstallable(e) {
             logsSheet.clear();
             logToSheet("Cleared output and log sheet.");
             deleteLastRowProperties();
-            controlsSheet.getRange("L20").setValue(false);
+            controlsSheet.getRange("M20").setValue(false);
         }
     }
-    if (editedRange.getSheet().getName() === "Controls" && editedRange.getA1Notation() === "L30") {
+    if (editedRange.getSheet().getName() === "Controls" && editedRange.getA1Notation() === "M30") {
         if (editedValue === "TRUE") {
             resetYoutubeColumnDColor();
-            controlsSheet.getRange("L30").setValue(false);
+            controlsSheet.getRange("M30").setValue(false);
         }
     }
 
-    if (editedRange.getSheet().getName() === "Controls" && editedRange.getA1Notation() === "L42") {
+    if (editedRange.getSheet().getName() === "Controls" && editedRange.getA1Notation() === "M42") {
         if (editedValue === "TRUE") {
             resetRoosterTeethColumnDColor();
-            controlsSheet.getRange("L42").setValue(false);
+            controlsSheet.getRange("M42").setValue(false);
         }
     }
+
+       if (editedRange.getSheet().getName() === "Controls" && editedRange.getA1Notation() === "F51") {
+        if (editedValue === "Enabled") {
+            scriptProperties.setProperty('fuzzyMatchingApplied', 'true');
+            logToSheet("Fuzzy Matching Applied");
+        } else if (editedValue === "Disabled") {
+            scriptProperties.setProperty('fuzzyMatchingApplied', 'false');
+            logToSheet("Fuzzy Matching Disabled");
+        }
+       }
+
+
 
 
 
@@ -109,7 +121,7 @@ function organizeData() {
     //logToSheet("Determined last row in output sheet.");
 
     // Batch sizes ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    var youtubeBatchSize = controlsSheet.getRange("L7").getValue(); // Process X YouTube rows at a time
+    var youtubeBatchSize = controlsSheet.getRange("M7").getValue(); // Process X YouTube rows at a time
     var roosterTeethBatchSize = 1500; // Process X RoosterTeeth rows at a time
     logToSheet(`Set YouTube batch size to ${youtubeBatchSize} and RoosterTeeth batch size to ${roosterTeethBatchSize}.`);
 
@@ -128,6 +140,12 @@ function organizeData() {
     var usersTimeInput = controlsSheet.getRange("F33").getValue();
     var timeInterval = usersTimeInput * 24 * 60 * 60 * 1000;
     logToSheet(`Set desired show name to: ${desiredShowName}, and the time range to search for a match before and after release to: ${usersTimeInput} day`);
+
+    // Grab users desired percentage to qualify a match with fuzzy matching
+    var matchPercentage = controlsSheet.getRange("F59").getValue();
+    if (scriptProperties.getProperty('fuzzyMatchingApplied') === 'true') {
+       logToSheet(`FUZZY MATCHING ENABLED, SETTING SIMILARITY PERCENTAGE TO MATCH TO   ${matchPercentage} %`)
+    }
 
 
 
@@ -172,10 +190,9 @@ function organizeData() {
             //for (let i = 0; i < ytDateBackgroundColors.length; i++) {
             //logToSheet(`Row ${lastYouTubeRow + i}: Background color - ${ytDateBackgroundColors[i][0]}, for youtubebackgroundcolor range ${ytDateBackgroundColors}`);   // this If Loop is used to log every color in the YT color array for debugging
             //}
-                    // Stop if drop down changed to stop
-                if (scriptProperties.getProperty('runOrganizeData') === 'false') {
+               if (scriptProperties.getProperty('runOrganizeData') === 'false') {
                logToSheet("Process stopped by user.");
-               return;
+              return;
                }
 
 
@@ -246,9 +263,32 @@ function organizeData() {
                      }
 
 
-                    // IF YT and RT have a MATCH  ------------------------------------------------------------------------------------------------------------------------------------------------
+                    // Check If YT and RT have a MATCH  ------------------------------------------------------------------------------------------------------------------------------------------------
                     if (roosterTeethShowName === desiredShowName && Math.abs(youtubeDate - roosterTeethDate) <= timeInterval) {
-                      
+
+                         // If Fuzzy matching is applied check similatrity return as percentage
+                          if (scriptProperties.getProperty('fuzzyMatchingApplied') === 'true') {
+                             var similarity = jaccardSimilarity(youtubeVidTitle, roosterteehVidTitle);
+                             if ((similarity * 100) > matchPercentage){
+                                youtubeSheet.getRange(i + 2, 4).setBackground("green");
+                                roosterTeethSheet.getRange(currentRTRow + j, 4).setBackground("green");
+                                logMatchToSheet(`POTENTIAL MATCH FOUND FOR YT VIDEO  ${youtubeVidTitle},    WITH RT VIDEO  ${roosterteehVidTitle}   AND A SIMILARITY OF  ${similarity * 100 }`);
+
+                                // Add YouTube URL and matching RoosterTeeth URL to output data
+                                outputData.push([youtubeVidTitle, youtubeURL, roosterteehVidTitle, roosterTeethURL]);
+
+                                // Update the background color in the RT Color array 
+                                roosterTeethDataRange.getCell(j + 1, 4).setBackground("green");
+
+                                // Break the loop as a match has been found
+                                matchFound = true;
+                                break;
+                             }
+                             else 
+                             logToSheet(`Videos had a similarity of ${similarity * 100 }  skipping `);
+                             continue;
+                        }
+
                         // Set background color of RoosterTeeth and Youtube Date cell to green
                         youtubeSheet.getRange(i + 2, 4).setBackground("green");
                         roosterTeethSheet.getRange(currentRTRow + j, 4).setBackground("green");
@@ -381,6 +421,23 @@ function createindex(){
   return yearStartRows;
 }
 
+
+// FUZZY MATCHING FUNCTION
+function jaccardSimilarity(str1, str2) {
+  var set1 = new Set(str1.toLowerCase().split(/\s+/));
+  var set2 = new Set(str2.toLowerCase().split(/\s+/));
+
+  var intersection = new Set([...set1].filter(x => set2.has(x)));
+  var union = new Set([...set1, ...set2]);
+
+  return intersection.size / union.size; // Return the Jaccard index
+}
+
+
+
+
+
+
 // reset TY date column color
 function resetYoutubeColumnDColor() {
     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -402,6 +459,8 @@ function resetRoosterTeethColumnDColor() {
     }
 
 }
+
+
 
 
 
@@ -504,7 +563,7 @@ function logMatchToSheet(message) {
 
 
 
-// Function to log messages with a red background, used to highligt non matches or specific log you want to see when debugging
+// Function to log messages with a red background, used to highligt non matches 
 function logNoMatchToSheet(message) {
     const logsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Logs');
     const nextAvailableRow = logsSheet.getLastRow() + 1;
@@ -515,6 +574,21 @@ function logNoMatchToSheet(message) {
     // Set the log entry and the background color
     logRange.setValue(logEntry);
     logRange.setBackground('#ea9999'); // Set background color to light green
+}
+
+
+
+// Function to log messages with a red background, specific log you want to see when debugging
+function logDebuggingLogToSheet(message) {
+    const logsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Logs');
+    const nextAvailableRow = logsSheet.getLastRow() + 1;
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy hh:mm:ss a');
+    const logEntry = `${timestamp}: ${message}`;
+    const logRange = logsSheet.getRange(nextAvailableRow, 1);
+    
+    // Set the log entry and the background color
+    logRange.setValue(logEntry);
+    logRange.setBackground('#f6b26b'); // Set background color to light green
 }
 
 
